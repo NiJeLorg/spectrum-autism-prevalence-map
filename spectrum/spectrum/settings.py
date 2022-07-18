@@ -27,12 +27,11 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ["DJANGO_DEBUG"]
+DEBUG = (os.getenv('DJANGO_DEBUG', 'False') == 'True')
 
-if DEBUG == "True":
-    ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
-else:
-    ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost").split(",")
+ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost").split(",")
+
+GMAP_API_KEY = os.environ["GMAP_API_KEY"]
 
 # Application definition
 
@@ -55,6 +54,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'admin_ip_restrictor.middleware.AdminIPRestrictorMiddleware',
 ]
 
 ROOT_URLCONF = 'spectrum.urls'
@@ -123,13 +123,34 @@ USE_I18N = True
 
 USE_L10N = True
 
-USE_TZ = True
+# USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/1.11/howto/static-files/
 
 STATIC_URL = os.environ["DJANGO_STATIC_URL"]
+
+STATIC_ROOT = f"{BASE_DIR}" + "/static/"
+
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, "/spectrum/autism_prevalence_map/")
+    (f"{BASE_DIR}" + "/autism_prevalence_map/")
 ]
+
+# Access Restrictions
+RESTRICT_ADMIN=True
+ALLOWED_ADMIN_IPS=['127.0.0.1', '::1']
+ALLOWED_ADMIN_IP_RANGES = ["34.231.5.44/32",
+                           "34.226.50.120/32",
+                           "34.198.66.69/32",
+                           "34.192.31.106/32",
+                           "34.231.5.44/32",
+                           "158.106.193.214/32",
+                           "158.106.193.218/32",
+                           "158.106.193.198/32",
+                           "65.51.12.214/32",
+                           "65.51.12.218/32",
+                           "65.51.12.198/32"
+                           ]
+RESTRICTED_APP_NAMES=['admin']
+TRUST_PRIVATE_IP=True

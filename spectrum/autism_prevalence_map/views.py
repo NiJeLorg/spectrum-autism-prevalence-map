@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
+import os
 from datetime import date
 import re, csv
 from django.contrib.postgres.search import SearchVector, SearchQuery
@@ -27,9 +28,10 @@ def index(request):
 		studytype = request.GET.get("studytype","")
 		keyword = request.GET.get("keyword","")
 		timeline_type = request.GET.get("timeline_type","published")
+		meanincome = request.GET.get("meanincome","")
+		education = request.GET.get("education","")
 
-
-	context_dict = {"min_yearpublished":min_yearpublished, "max_yearpublished":max_yearpublished, "yearsstudied_number_min":yearsstudied_number_min, "yearsstudied_number_max":yearsstudied_number_max, "min_samplesize":min_samplesize, "max_samplesize":max_samplesize, "min_prevalenceper10000":min_prevalenceper10000, "max_prevalenceper10000":max_prevalenceper10000, "studytype":studytype , "keyword":keyword, "timeline_type":timeline_type}
+	context_dict = {"min_yearpublished":min_yearpublished, "max_yearpublished":max_yearpublished, "yearsstudied_number_min":yearsstudied_number_min, "yearsstudied_number_max":yearsstudied_number_max, "min_samplesize":min_samplesize, "max_samplesize":max_samplesize, "min_prevalenceper10000":min_prevalenceper10000, "max_prevalenceper10000":max_prevalenceper10000, "studytype":studytype , "keyword":keyword, "timeline_type":timeline_type, "meanincome":meanincome, "education":education}
 	return render(request, 'autism_prevalence_map/map.html', context_dict)
 
 
@@ -49,9 +51,10 @@ def list_view(request):
 		studytype = request.GET.get("studytype","")
 		keyword = request.GET.get("keyword","")
 		timeline_type = request.GET.get("timeline_type","published")
+		meanincome = request.GET.get("meanincome","")
+		education = request.GET.get("education","")
 
-
-	context_dict = {"min_yearpublished":min_yearpublished, "max_yearpublished":max_yearpublished,"yearsstudied_number_min":yearsstudied_number_min, "yearsstudied_number_max":yearsstudied_number_max, "min_samplesize":min_samplesize, "max_samplesize":max_samplesize, "min_prevalenceper10000":min_prevalenceper10000, "max_prevalenceper10000":max_prevalenceper10000, "studytype":studytype ,"keyword":keyword, "timeline_type":timeline_type}
+	context_dict = {"min_yearpublished":min_yearpublished, "max_yearpublished":max_yearpublished,"yearsstudied_number_min":yearsstudied_number_min, "yearsstudied_number_max":yearsstudied_number_max, "min_samplesize":min_samplesize, "max_samplesize":max_samplesize, "min_prevalenceper10000":min_prevalenceper10000, "max_prevalenceper10000":max_prevalenceper10000, "studytype":studytype ,"keyword":keyword, "timeline_type":timeline_type, "meanincome":meanincome, "education":education}
 
 	return render(request, 'autism_prevalence_map/list.html', context_dict)
 
@@ -61,16 +64,24 @@ def about(request):
 	"""
 	  About page
 	"""
-	context_dict = {}
+	if os.environ["DJANGO_ALLOWED_HOSTS"] == 'prevalence-staging.spectrumnews.org' :
+		css_base = 'https://staging.spectrumnews.org'
+	elif os.environ["DJANGO_ALLOWED_HOSTS"] == '127.0.0.1' :
+		css_base = 'http://dev.spectrum.test:8010'
+	else :
+		css_base = 'https://www.spectrumnews.org'
+	context_dict = {
+		'css_base' : css_base,
+	}
 	return render(request, 'autism_prevalence_map/about.html', context_dict)
 
 
 def studiesApi(request):
-	#add in the items geojson requires 
+	#add in the items geojson requires
 	response = {}
 	response['type'] = "FeatureCollection"
 	response['features'] = []
-	
+
 	if request.method == 'GET':
 		kwargs = {}
 		# filters
@@ -85,6 +96,8 @@ def studiesApi(request):
 		studytype = request.GET.get("studytype","")
 		keyword = request.GET.get("keyword","")
 		timeline_type = request.GET.get("timeline_type","published")
+		meanincome = request.GET.get("meanincome","")
+		education = request.GET.get("education","")
 
 
 		#apply filters
@@ -94,7 +107,7 @@ def studiesApi(request):
 				kwargs['yearpublished_number__gte'] = date(int(min_yearpublished_re), 1, 1)
 			except TypeError:
 				response['status'] = "The minimum year of publication you entered was not a recognizable 4-digit year. Please try again."
-				
+
 		if max_yearpublished:
 			try:
 				max_yearpublished_re = re.sub("[^0-9]", "", max_yearpublished)
@@ -109,7 +122,7 @@ def studiesApi(request):
 				kwargs['yearsstudied_number_min__gte'] = date(int(yearsstudied_number_min_re), 1, 1)
 			except TypeError:
 				response['status'] = "The minimum year studied you entered was not a recognizable 4-digit year. Please try again."
-				
+
 		if yearsstudied_number_max:
 			try:
 				yearsstudied_number_max_re = re.sub("[^0-9]", "", yearsstudied_number_max)
@@ -131,7 +144,6 @@ def studiesApi(request):
 				kwargs['samplesize_number__lte'] = int(max_samplesize_re)
 			except ValueError:
 				response['status'] = "The maximum study size you entered was not a recognizable number. Please try again."
-			
 
 		if min_prevalenceper10000:
 			try:
@@ -139,14 +151,18 @@ def studiesApi(request):
 				kwargs['prevalenceper10000_number__gte'] = float(min_prevalenceper10000_re)
 			except ValueError:
 				response['status'] = "The minimum prevalence rate you entered was not a recognizable number. Please try again."
-		
+
 		if max_prevalenceper10000:
 			try:
 				max_prevalenceper10000_re = re.findall(r"[-+]?\d*\.\d+|\d+", max_prevalenceper10000)[0]
 				kwargs['prevalenceper10000_number__lte'] = float(max_prevalenceper10000_re)
 			except ValueError:
-				response['status'] = "The maximum prevalence rate you entered was not a recognizable number. Please try again."			
-		
+				response['status'] = "The maximum prevalence rate you entered was not a recognizable number. Please try again."
+
+		if meanincome:
+			kwargs['meanincomeofparticipants'] = meanincome
+		if education:
+			kwargs['educationlevelofparticipants'] = education
 		if studytype:
 			kwargs['studytype__icontains'] = studytype
 
@@ -156,12 +172,12 @@ def studiesApi(request):
 		#pull data with lat/lngs only
 		kwargs['latitude__isnull'] = False
 		kwargs['longitude__isnull'] = False
-		
+
 		# add postgres keyword search
 		if keyword:
 			#search vectors
 			vector = (
-				SearchVector('yearpublished') + 
+				SearchVector('yearpublished') +
 				SearchVector('authors') +
 				SearchVector('country') +
 				SearchVector('area') +
@@ -169,6 +185,7 @@ def studiesApi(request):
 				SearchVector('samplesize') +
 				SearchVector('individualswithautism') +
 				SearchVector('diagnosticcriteria') +
+				SearchVector('diagnostictools') +
 				SearchVector('percentwaverageiq') +
 				SearchVector('sexratiomf') +
 				SearchVector('prevalenceper10000') +
@@ -187,11 +204,7 @@ def studiesApi(request):
 				SearchVector('link3title') +
 				SearchVector('link3url') +
 				SearchVector('link4title') +
-				SearchVector('link4url') +
-				SearchVector('sourceofdataforthisspreadsheet') +
-				SearchVector('ericsqualityassessment') +
-				SearchVector('ericsreasonsbasedonmyrecallofthestudies') +
-				SearchVector('commentsfromotheradvisors')
+				SearchVector('link4url')
 			)
 
 
@@ -199,7 +212,7 @@ def studiesApi(request):
 		else:
 			pulled_studies = studies.objects.filter(**kwargs)
 
-			
+
 		for study in pulled_studies:
 			data = {}
 			data['type'] = 'Feature'
@@ -213,6 +226,7 @@ def studiesApi(request):
 			data['properties']['age'] = study.age
 			data['properties']['individualswithautism'] = study.individualswithautism
 			data['properties']['diagnosticcriteria'] = study.diagnosticcriteria
+			data['properties']['diagnostictools'] = study.diagnostictools
 			data['properties']['percentwaverageiq'] = study.percentwaverageiq
 			data['properties']['sexratiomf'] = study.sexratiomf
 			data['properties']['prevalenceper10000'] = study.prevalenceper10000
@@ -235,19 +249,15 @@ def studiesApi(request):
 			data['properties']['link3url'] = study.link3url
 			data['properties']['link4title'] = study.link4title
 			data['properties']['link4url'] = study.link4url
-			data['properties']['sourceofdataforthisspreadsheet'] = study.sourceofdataforthisspreadsheet
-			data['properties']['ericsqualityassessment'] = study.ericsqualityassessment
-			data['properties']['ericsreasonsbasedonmyrecallofthestudies	'] = study.ericsreasonsbasedonmyrecallofthestudies	
-			data['properties']['commentsfromotheradvisors'] = study.commentsfromotheradvisors
 			data['geometry'] = {}
 			data['geometry']['type'] = 'Point'
 			data['geometry']['coordinates'] = [study.longitude, study.latitude]
 			response['features'].append(data)
 
-		response['status'] = "OK"
+		response['status'] = "200"
 
 	else:
-		print request.method
+		print(request.method)
 
 	return JsonResponse(response)
 
@@ -256,7 +266,7 @@ def studiesCsv(request):
 	#create header for CSV file download
 	response = HttpResponse(content_type='text/csv')
 	response['Content-Disposition'] = 'attachment; filename="spectrum_autism_prevalence_map_data_download.csv"'
-	
+
 	if request.method == 'GET':
 		kwargs = {}
 		# filters
@@ -271,6 +281,8 @@ def studiesCsv(request):
 		studytype = request.GET.get("studytype","")
 		keyword = request.GET.get("keyword","")
 		timeline_type = request.GET.get("timeline_type","published")
+		meanincome = request.GET.get("meanincome","")
+		education = request.GET.get("education","")
 
 
 		#apply filters
@@ -280,7 +292,7 @@ def studiesCsv(request):
 				kwargs['yearpublished_number__gte'] = date(int(min_yearpublished_re), 1, 1)
 			except TypeError:
 				response['status'] = "The minimum year of publication you entered was not a recognizable 4-digit year. Please try again."
-				
+
 		if max_yearpublished:
 			try:
 				max_yearpublished_re = re.sub("[^0-9]", "", max_yearpublished)
@@ -294,7 +306,7 @@ def studiesCsv(request):
 				kwargs['yearsstudied_number_min__gte'] = date(int(yearsstudied_number_min_re), 1, 1)
 			except TypeError:
 				response['status'] = "The minimum year studied you entered was not a recognizable 4-digit year. Please try again."
-				
+
 		if yearsstudied_number_max:
 			try:
 				yearsstudied_number_max_re = re.sub("[^0-9]", "", yearsstudied_number_max)
@@ -315,7 +327,7 @@ def studiesCsv(request):
 				kwargs['samplesize_number__lte'] = int(max_samplesize_re)
 			except ValueError:
 				response['status'] = "The maximum study size you entered was not a recognizable number. Please try again."
-			
+
 
 		if min_prevalenceper10000:
 			try:
@@ -323,14 +335,18 @@ def studiesCsv(request):
 				kwargs['prevalenceper10000_number__gte'] = float(min_prevalenceper10000_re)
 			except ValueError:
 				response['status'] = "The minimum prevalence rate you entered was not a recognizable number. Please try again."
-		
+
 		if max_prevalenceper10000:
 			try:
 				max_prevalenceper10000_re = re.findall(r"[-+]?\d*\.\d+|\d+", max_prevalenceper10000)[0]
 				kwargs['prevalenceper10000_number__lte'] = float(max_prevalenceper10000_re)
 			except ValueError:
-				response['status'] = "The maximum prevalence rate you entered was not a recognizable number. Please try again."			
-		
+				response['status'] = "The maximum prevalence rate you entered was not a recognizable number. Please try again."
+
+		if meanincome:
+			kwargs['meanincomeofparticipants'] = meanincome
+		if education:
+			kwargs['educationlevelofparticipants'] = education
 		if studytype:
 			kwargs['studytype__icontains'] = studytype
 
@@ -354,6 +370,7 @@ def studiesCsv(request):
 				SearchVector('samplesize') +
 				SearchVector('individualswithautism') +
 				SearchVector('diagnosticcriteria') +
+				SearchVector('diagnostictools') +
 				SearchVector('percentwaverageiq') +
 				SearchVector('sexratiomf') +
 				SearchVector('prevalenceper10000') +
@@ -372,11 +389,7 @@ def studiesCsv(request):
 				SearchVector('link3title') +
 				SearchVector('link3url') +
 				SearchVector('link4title') +
-				SearchVector('link4url') +
-				SearchVector('sourceofdataforthisspreadsheet') +
-				SearchVector('ericsqualityassessment') +
-				SearchVector('ericsreasonsbasedonmyrecallofthestudies') +
-				SearchVector('commentsfromotheradvisors')
+				SearchVector('link4url')
 			)
 
 
@@ -388,15 +401,15 @@ def studiesCsv(request):
 		writer = csv.writer(response)
 
 		# CSV header
-		writer.writerow(['Year published', 'Authors', 'Country', 'Area', 'Sample size', 'Age (years)', 'Individuals with autism', 'Diagnostic criteria', 'Percent w/ average IQ', 'Sex ratio (M:F)', 'Prevalence (per 10,000)', '95% Confidence interval', 'Category (AD, PDD or ASD)', 'Year(s) studied', 'Recommended', 'Study type', 'Mean income of participants', 'Education level of participants', 'Citation', 'Link 1 Title', 'Link 1 URL', 'Link 2 Title', 'Link 2 URL', 'Link 3 Title', 'Link 3 URL', 'Link 4 Title', 'Link 4 URL'])
+		writer.writerow(['Year published', 'Authors', 'Country', 'Area', 'Sample size', 'Age (years)', 'Individuals with autism', 'Diagnostic criteria', 'Diagnostic tools', 'Percent w/ average IQ', 'Sex ratio (M:F)', 'Prevalence (per 10,000)', '95% Confidence interval', 'Category (AD, PDD or ASD)', 'Year(s) studied', 'Recommended', 'Study type', 'Mean income of participants', 'Education level of participants', 'Citation', 'Link 1 Title', 'Link 1 URL', 'Link 2 Title', 'Link 2 URL', 'Link 3 Title', 'Link 3 URL', 'Link 4 Title', 'Link 4 URL'])
 
 
 		for study in pulled_studies:
-			writer.writerow([study.yearpublished.encode('utf8'), study.authors.encode('utf8'), study.country.encode('utf8'), study.area.encode('utf8'), study.samplesize.encode('utf8'), study.age.encode('utf8'), study.individualswithautism.encode('utf8'), study.diagnosticcriteria.encode('utf8'), study.percentwaverageiq.encode('utf8'), study.sexratiomf.encode('utf8'), study.prevalenceper10000.encode('utf8'), study.confidenceinterval.encode('utf8'), study.categoryadpddorasd.encode('utf8'), study.yearsstudied.encode('utf8'), study.recommended.encode('utf8'), study.studytype.encode('utf8'), study.meanincomeofparticipants.encode('utf8'), study.educationlevelofparticipants.encode('utf8'), study.citation.encode('utf8'), study.link1title.encode('utf8'),  study.link1url.encode('utf8'), study.link2title.encode('utf8'),  study.link2url.encode('utf8'), study.link3title.encode('utf8'),  study.link3url.encode('utf8'), study.link4title.encode('utf8'),  study.link4url.encode('utf8')])
+			writer.writerow([study.yearpublished.encode('utf8'), study.authors.encode('utf8'), study.country.encode('utf8'), study.area.encode('utf8'), study.samplesize.encode('utf8'), study.age.encode('utf8'), study.individualswithautism.encode('utf8'), study.diagnosticcriteria.encode('utf8'), study.diagnostictools.encode('utf8'), study.percentwaverageiq.encode('utf8'), study.sexratiomf.encode('utf8'), study.prevalenceper10000.encode('utf8'), study.confidenceinterval.encode('utf8'), study.categoryadpddorasd.encode('utf8'), study.yearsstudied.encode('utf8'), study.recommended.encode('utf8'), study.studytype.encode('utf8'), study.meanincomeofparticipants.encode('utf8'), study.educationlevelofparticipants.encode('utf8'), study.citation.encode('utf8'), study.link1title.encode('utf8'),  study.link1url.encode('utf8'), study.link2title.encode('utf8'),  study.link2url.encode('utf8'), study.link3title.encode('utf8'),  study.link3url.encode('utf8'), study.link4title.encode('utf8'),  study.link4url.encode('utf8')])
 
-		response['status'] = "OK"
+		response['status'] = "200"
 
 	else:
-		print request.method
+		print(request.method)
 
-	return response	
+	return response
